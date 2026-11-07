@@ -1,68 +1,113 @@
-import Image from "next/image";
+import { createClient } from '@/lib/supabase/server';
+import DailySheetForm from '@/components/daily-sheet/DailySheetForm';
+import Link from 'next/link';
 
-export default function Home() {
+// Page d'accueil : Accès direct à la fiche journalière et démonstration
+export default async function HomePage() {
+  const supabase = await createClient();
+
+  // On récupère la station de démo ou la première station existante
+  let { data: station } = await supabase
+    .from('stations')
+    .select('*')
+    .limit(1)
+    .maybeSingle();
+
+  if (!station) {
+    station = {
+      id: '22222222-2222-2222-2222-222222222222',
+      name: 'HLACOMEY',
+      network: 'BENIN PETRO',
+      country: 'Bénin',
+      tenant_id: '11111111-1111-1111-1111-111111111111',
+      code: 'HLA',
+      is_active: true,
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  // Chargement des données pour la station
+  const [
+    { data: products },
+    { data: pumps },
+    { data: lubricants },
+    { data: gasProducts },
+    { data: paymentMethods },
+    { data: loyaltyCards },
+  ] = await Promise.all([
+    supabase.from('fuel_products').select('*').eq('station_id', station.id).eq('is_active', true).order('sort_order'),
+    supabase.from('fuel_pumps').select('*').eq('station_id', station.id).eq('is_active', true).order('pump_number'),
+    supabase.from('lubricants').select('*').eq('station_id', station.id).eq('is_active', true).order('sort_order'),
+    supabase.from('gas_products').select('*').eq('station_id', station.id).eq('is_active', true).order('sort_order'),
+    supabase.from('payment_methods').select('*').eq('station_id', station.id).eq('is_active', true).order('sort_order'),
+    supabase.from('loyalty_cards').select('*').eq('station_id', station.id).eq('is_active', true).order('sort_order'),
+  ]);
+
+  // Valeurs de secours si la base vient juste d'être initialisée
+  const finalProducts = (products && products.length > 0) ? products : [
+    { id: 'p1', name: 'ESSENCE', code: 'ESS', unit_price: 750, is_active: true, sort_order: 1, station_id: station.id },
+    { id: 'p2', name: 'GASOIL', code: 'GAS', unit_price: 765, is_active: true, sort_order: 2, station_id: station.id },
+  ];
+
+  const finalPumps = (pumps && pumps.length > 0) ? pumps : [
+    { id: 'pm1', pump_number: 1, name: 'Pompe 1', fuel_product_id: 'p1', is_active: true, station_id: station.id },
+    { id: 'pm2', pump_number: 2, name: 'Pompe 2', fuel_product_id: 'p1', is_active: true, station_id: station.id },
+    { id: 'pm3', pump_number: 1, name: 'Pompe 1', fuel_product_id: 'p2', is_active: true, station_id: station.id },
+    { id: 'pm4', pump_number: 2, name: 'Pompe 2', fuel_product_id: 'p2', is_active: true, station_id: station.id },
+  ];
+
+  const finalLubricants = (lubricants && lubricants.length > 0) ? lubricants : [
+    { id: 'l1', name: 'HE 50', unit: 'L', unit_price: 2500, min_stock_alert: 5, is_active: true, sort_order: 1, station_id: station.id },
+    { id: 'l2', name: '50 5L', unit: 'Bidon', unit_price: 12000, min_stock_alert: 5, is_active: true, sort_order: 2, station_id: station.id },
+    { id: 'l3', name: '50 1L', unit: 'Bidon', unit_price: 3000, min_stock_alert: 5, is_active: true, sort_order: 3, station_id: station.id },
+    { id: 'l4', name: '40 5L', unit: 'Bidon', unit_price: 11500, min_stock_alert: 5, is_active: true, sort_order: 4, station_id: station.id },
+  ];
+
+  const finalGas = (gasProducts && gasProducts.length > 0) ? gasProducts : [
+    { id: 'g1', name: 'Bouteille 6kg', unit: 'Bouteille', unit_price: 4500, consigne_price: 15000, min_stock_alert: 5, is_active: true, sort_order: 1, station_id: station.id },
+    { id: 'g2', name: 'Bouteille 12.5kg', unit: 'Bouteille', unit_price: 10000, consigne_price: 25000, min_stock_alert: 5, is_active: true, sort_order: 2, station_id: station.id },
+  ];
+
+  const finalLoyalty = (loyaltyCards && loyaltyCards.length > 0) ? loyaltyCards : [
+    { id: 'c1', name: 'CLASSIC', network: 'TPA Ad9000', is_active: true, sort_order: 1, station_id: station.id },
+    { id: 'c2', name: 'PRIVILEGE', network: 'TPA Ad9000', is_active: true, sort_order: 2, station_id: station.id },
+    { id: 'c3', name: 'NOBLESSE', network: 'TPA Ad9000', is_active: true, sort_order: 3, station_id: station.id },
+    { id: 'c4', name: 'SUBLIM CARTE', network: 'TPA Ad9000', is_active: true, sort_order: 4, station_id: station.id },
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-screen bg-gray-50 pb-12">
+      {/* Banner Station */}
+      <header className="bg-blue-800 text-white px-6 py-4 shadow-md flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">⛽</span>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">BENIN PETRO — Station HLACOMEY</h1>
+            <p className="text-xs text-blue-200">Gestion journalière numérique & contrôle en temps réel</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/login"
+            className="text-xs bg-blue-900 hover:bg-blue-950 px-3 py-1.5 rounded-lg border border-blue-700 transition"
+          >
+            🔐 Espace Gérant
+          </Link>
+        </div>
+      </header>
+
+      {/* Formulaire de Fiche Journalière Directe */}
+      <main className="mt-4">
+        <DailySheetForm
+          station={station}
+          products={finalProducts}
+          pumps={finalPumps}
+          lubricants={finalLubricants}
+          gasProducts={finalGas}
+          paymentMethods={paymentMethods || []}
+          loyaltyCards={finalLoyalty}
+          currencySymbol="FCFA"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
       </main>
     </div>
   );
